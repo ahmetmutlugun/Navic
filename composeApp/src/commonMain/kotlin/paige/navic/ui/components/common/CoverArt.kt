@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.LocalPlatformContext
 import coil3.compose.SubcomposeAsyncImage
+import coil3.network.NetworkHeaders
+import coil3.network.httpHeaders
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.crossfade
@@ -57,7 +59,11 @@ fun CoverArt(
 ) {
 	val uriHandler = LocalUriHandler.current
 	val platformContext = LocalPlatformContext.current
-	val model = remember(coverArtId) {
+	val customHeaders = Settings.shared.customHeaders
+	val model = remember(coverArtId, customHeaders) {
+		val networkHeaders = NetworkHeaders.Builder().apply {
+			Settings.shared.customHeadersMap().forEach { (key, value) -> add(key, value) }
+		}.build()
 		ImageRequest.Builder(platformContext)
 			.data(coverArtId?.let { SessionManager.api.getCoverArtUrl(it, auth = true) })
 			.memoryCacheKey(coverArtId)
@@ -65,6 +71,7 @@ fun CoverArt(
 			.diskCachePolicy(CachePolicy.ENABLED)
 			.memoryCachePolicy(CachePolicy.ENABLED)
 			.crossfade(crossfadeMs)
+			.httpHeaders(networkHeaders)
 			.build()
 	}
 

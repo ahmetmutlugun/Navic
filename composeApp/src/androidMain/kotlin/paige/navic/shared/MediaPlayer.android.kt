@@ -15,8 +15,10 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaController
 import androidx.media3.session.MediaSession
@@ -79,8 +81,13 @@ class PlaybackService : MediaSessionService(), KoinComponent {
 				setSmallIcon(resourceProvider.icNavic)
 			}
 
+		val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+			.setDefaultRequestProperties(Settings.shared.customHeadersMap())
+		val mediaSourceFactory = DefaultMediaSourceFactory(httpDataSourceFactory)
+
 		val player = ExoPlayer.Builder(this)
 			.setLoadControl(loadControl)
+			.setMediaSourceFactory(mediaSourceFactory) // Injects custom headers
 			.setHandleAudioBecomingNoisy(true)
 			.build()
 			.apply {
@@ -679,7 +686,10 @@ class AndroidMediaPlayerViewModel(
 			.build()
 
 		val uri = when {
-			id.startsWith("radio_") && !filePath.isNullOrEmpty() -> { filePath.toUri() }
+			id.startsWith("radio_") && !filePath.isNullOrEmpty() -> {
+				filePath.toUri()
+			}
+
 			else -> {
 				val localPath = downloadManager.getDownloadedFilePath(id)
 				if (localPath != null) {

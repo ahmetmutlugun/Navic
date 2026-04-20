@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.flow.update
 import paige.navic.data.database.SyncManager
+import paige.navic.data.models.settings.Settings
 import paige.navic.data.session.SessionManager
 import paige.navic.domain.models.DomainRadio
 import paige.navic.domain.models.DomainSong
@@ -20,6 +21,7 @@ import platform.AVFAudio.AVAudioSessionCategoryPlayback
 import platform.AVFAudio.setActive
 import platform.AVFoundation.AVPlayer
 import platform.AVFoundation.AVPlayerItem
+import platform.AVFoundation.AVURLAsset
 import platform.AVFoundation.AVPlayerItemDidPlayToEndTimeNotification
 import platform.AVFoundation.addPeriodicTimeObserverForInterval
 import platform.AVFoundation.currentItem
@@ -68,7 +70,8 @@ class IOSMediaPlayerViewModel(
 ) {
 	private val player = AVPlayer()
 	private var timeObserver: Any? = null
-	private val scrobbleManager = IOSScrobbleManager(player, viewModelScope, connectivityManager, syncManager)
+	private val scrobbleManager =
+		IOSScrobbleManager(player, viewModelScope, connectivityManager, syncManager)
 	private var pendingSyncState: PlayerUiState? = null
 
 	init {
@@ -150,7 +153,7 @@ class IOSMediaPlayerViewModel(
 
 		val url = getSongUrl(songToPlay) ?: return
 
-		player.replaceCurrentItemWithPlayerItem(AVPlayerItem(url))
+		player.replaceCurrentItemWithPlayerItem(createAVPlayerItem(url))
 		player.play()
 
 		_uiState.update {
@@ -208,7 +211,7 @@ class IOSMediaPlayerViewModel(
 
 		val url = NSURL.URLWithString(radio.streamUrl)
 		if (url != null) {
-			player.replaceCurrentItemWithPlayerItem(AVPlayerItem(url))
+			player.replaceCurrentItemWithPlayerItem(createAVPlayerItem(url))
 			player.play()
 		}
 
@@ -402,12 +405,14 @@ class IOSMediaPlayerViewModel(
 
 		info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(
 			boundsSize = CGSizeMake(512.0, 512.0),
-			requestHandler = {
-				return@MPMediaItemArtwork song.coverArtId
-					?.let { SessionManager.api.getCoverArtUrl(it, auth = true) }
-					?.let { NSURL.URLWithString(it) }
-					?.let { NSData.dataWithContentsOfURL(it) }
-					?.let { UIImage(data = it) } ?: UIImage()
+			requestHandler = { _ ->
+				runCatching {
+					song.coverArtId
+						?.let { SessionManager.api.getCoverArtUrl(it, auth = true) }
+						?.let { NSURL.URLWithString(it) }
+						?.let { NSData.dataWithContentsOfURL(it) }
+						?.let { UIImage(data = it) }
+				}.getOrNull() ?: UIImage()
 			}
 		)
 
@@ -427,7 +432,7 @@ class IOSMediaPlayerViewModel(
 		val song = state.queue.getOrNull(index) ?: return
 
 		val url = getSongUrl(song) ?: return
-		player.replaceCurrentItemWithPlayerItem(AVPlayerItem(url))
+		player.replaceCurrentItemWithPlayerItem(createAVPlayerItem(url))
 
 		if (!song.id.startsWith("radio_")) {
 			val durationMs = song.duration.inWholeMilliseconds
@@ -440,11 +445,22 @@ class IOSMediaPlayerViewModel(
 		updateNowPlayingInfo(song)
 	}
 
+	private fun createAVPlayerItem(url: NSURL): AVPlayerItem {
+		val headers = Settings.shared.customHeadersMap()
+		if (headers.isEmpty() || url.isFileURL()) {
+			return AVPlayerItem(url)
+		}
+		val options: Map<Any?, Any?> = mapOf("AVURLAssetHTTPHeaderFieldsKey" to headers)
+
+		return AVPlayerItem(AVURLAsset(uRL = url, options = options))
+	}
+
 	private fun getSongUrl(song: DomainSong): NSURL? {
 		return when {
 			song.id.startsWith("radio_") && !song.filePath.isNullOrEmpty() -> {
 				NSURL.URLWithString(song.filePath)
 			}
+
 			else -> {
 				val localPath = downloadManager.getDownloadedFilePath(song.id)
 				if (localPath != null) {
