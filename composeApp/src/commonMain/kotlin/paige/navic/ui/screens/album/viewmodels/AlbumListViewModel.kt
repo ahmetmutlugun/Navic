@@ -13,14 +13,12 @@ import paige.navic.data.session.SessionManager
 import paige.navic.domain.models.DomainAlbum
 import paige.navic.domain.models.DomainAlbumListType
 import paige.navic.domain.repositories.AlbumRepository
-import paige.navic.managers.ConnectivityManager
 import paige.navic.utils.UiState
 
 @OptIn(ExperimentalCoroutinesApi::class)
 open class AlbumListViewModel(
 	initialListType: DomainAlbumListType = DomainAlbumListType.AlphabeticalByArtist,
-	private val repository: AlbumRepository,
-	connectivityManager: ConnectivityManager
+	private val repository: AlbumRepository
 ) : ViewModel() {
 	private val _albumsState =
 		MutableStateFlow<UiState<ImmutableList<DomainAlbum>>>(UiState.Loading())
@@ -32,13 +30,14 @@ open class AlbumListViewModel(
 	private val _starred = MutableStateFlow(false)
 	val starred = _starred.asStateFlow()
 
+	private val _rating = MutableStateFlow(0)
+	val rating = _rating.asStateFlow()
+
 	private val _listType = MutableStateFlow(initialListType)
 	val listType = _listType.asStateFlow()
 
 	private val _selectedReversed = MutableStateFlow(false)
 	val selectedReversed = _selectedReversed.asStateFlow()
-
-	val isOnline = connectivityManager.isOnline
 
 	val gridState = LazyGridState()
 
@@ -61,6 +60,7 @@ open class AlbumListViewModel(
 		viewModelScope.launch {
 			_selectedAlbum.value = album
 			_starred.value = repository.isAlbumStarred(album)
+			_rating.value = repository.getAlbumRating(album)
 		}
 	}
 
@@ -78,6 +78,16 @@ open class AlbumListViewModel(
 					repository.unstarAlbum(selection)
 				}
 				_starred.value = starred
+			}
+		}
+	}
+
+	fun setRating(rating: Int) {
+		viewModelScope.launch {
+			val selection = _selectedAlbum.value ?: return@launch
+			runCatching {
+				_rating.value = rating
+				repository.rateAlbum(selection, rating)
 			}
 		}
 	}

@@ -19,6 +19,9 @@ interface SongDao {
 	@Insert(onConflict = OnConflictStrategy.REPLACE)
 	suspend fun insertSongs(songs: List<SongEntity>)
 
+	@Insert(onConflict = OnConflictStrategy.IGNORE)
+	suspend fun insertSongsIgnoringConflicts(songs: List<SongEntity>)
+
 	@Query("SELECT * FROM SongEntity")
 	suspend fun getAllSongs(): List<SongEntity>
 
@@ -32,11 +35,20 @@ interface SongDao {
 	@Query("SELECT EXISTS(SELECT 1 FROM SongEntity WHERE songId = :songId AND starredAt IS NOT NULL)")
 	suspend fun isSongStarred(songId: String): Boolean
 
+	@Query("SELECT userRating FROM SongEntity WHERE songId = :songId")
+	suspend fun getSongRating(songId: String): Int?
+
 	@Query("DELETE FROM SongEntity")
 	suspend fun clearAllSongs()
 
 	@Query("SELECT songId FROM SongEntity")
 	suspend fun getAllSongIds(): List<String>
+
+	@Query("SELECT * FROM SongEntity WHERE songId IN (:ids)")
+	suspend fun getSongsByIds(ids: List<String>): List<SongEntity>
+
+	@Query("SELECT * FROM SongEntity WHERE title LIKE '%' || :query || '%' COLLATE NOCASE")
+	suspend fun searchSongsList(query: String): List<SongEntity>
 
 	@Transaction
 	suspend fun updateSongsByAlbumId(albumId: String, remoteSongs: List<SongEntity>) {

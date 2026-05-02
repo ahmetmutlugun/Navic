@@ -6,13 +6,14 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.add
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -24,6 +25,7 @@ import navic.composeapp.generated.resources.action_disable_sleep_timer
 import navic.composeapp.generated.resources.action_sleep_timer
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
+import paige.navic.LocalCtx
 import paige.navic.managers.SleepTimerManager
 import paige.navic.utils.label
 import kotlin.time.Duration.Companion.hours
@@ -43,6 +45,7 @@ val durations = listOf(
 fun SleepTimerSheet(
 	onDismissRequest: (confirmed: Boolean) -> Unit
 ) {
+	val ctx = LocalCtx.current
 	val contentPadding = PaddingValues(horizontal = 16.dp)
 	val colors = ListItemDefaults.colors(
 		containerColor = Color.Transparent,
@@ -60,6 +63,7 @@ fun SleepTimerSheet(
 		)) }
 	) {
 		Column(
+			modifier = Modifier.verticalScroll(rememberScrollState()),
 			verticalArrangement = Arrangement.spacedBy(8.dp)
 		) {
 			Text(
@@ -72,6 +76,7 @@ fun SleepTimerSheet(
 				ListItem(
 					content = { Text(it.label()) },
 					onClick = {
+						ctx.clickSound()
 						sleepTimerManager.startTimer(it)
 						onDismissRequest(true)
 					},
@@ -84,6 +89,7 @@ fun SleepTimerSheet(
 				ListItem(
 					content = { Text(stringResource(Res.string.action_disable_sleep_timer), color = MaterialTheme.colorScheme.error) },
 					onClick = {
+						ctx.clickSound()
 						sleepTimerManager.stopTimer()
 						onDismissRequest(true)
 					},

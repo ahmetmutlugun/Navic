@@ -2,6 +2,7 @@ package paige.navic.data.database.mappers
 
 import paige.navic.data.database.entities.SongEntity
 import paige.navic.domain.models.DomainContributor
+import paige.navic.domain.models.DomainExplicitStatus
 import paige.navic.domain.models.DomainReplayGain
 import paige.navic.domain.models.DomainSong
 import kotlin.time.Duration.Companion.seconds
@@ -11,7 +12,8 @@ fun ApiSong.toEntity() = SongEntity(
 	songId = this.id,
 	title = this.title,
 	artistName = this.artistName,
-	artistId = this.artistId,
+	// TODO: figure out why this can be null and how to handle it
+	artistId = this.artistId ?: "unknown artist",
 	albumTitle = this.albumTitle,
 	belongsToAlbumId = this.albumId,
 	coverArtId = this.coverArtId,
@@ -37,7 +39,7 @@ fun ApiSong.toEntity() = SongEntity(
 	bitDepth = this.bitDepth,
 	sampleRate = this.sampleRate,
 	audioChannelCount = this.audioChannelCount,
-	fileSize = this.fileSize,
+	fileSize = this.fileSize ?: 0L,
 	musicBrainzId = this.musicBrainzId,
 	contributors = this.contributors.map {
 		DomainContributor(
@@ -57,6 +59,11 @@ fun ApiSong.toEntity() = SongEntity(
 			fallbackGain = it.fallbackGain
 		)
 	},
+	explicitStatus = when (this.explicitStatus) {
+		ApiSong.ExplicitStatus.EXPLICIT -> DomainExplicitStatus.Explicit
+		ApiSong.ExplicitStatus.CLEAN -> DomainExplicitStatus.Clean
+		else -> DomainExplicitStatus.Unknown
+	}
 )
 
 fun SongEntity.toDomainModel() = DomainSong(
@@ -93,6 +100,7 @@ fun SongEntity.toDomainModel() = DomainSong(
 	musicBrainzId = this.musicBrainzId,
 	contributors = this.contributors,
 	replayGain = this.replayGain,
+	explicitStatus = this.explicitStatus
 )
 
 fun DomainSong.toEntity() = SongEntity(
@@ -128,5 +136,6 @@ fun DomainSong.toEntity() = SongEntity(
 	fileSize = this.fileSize,
 	musicBrainzId = this.musicBrainzId,
 	replayGain = this.replayGain,
-	contributors = this.contributors
+	contributors = this.contributors,
+	explicitStatus = this.explicitStatus
 )

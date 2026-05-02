@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.dropUnlessResumed
 import kotlinx.collections.immutable.persistentListOf
 import org.koin.compose.viewmodel.koinViewModel
 import paige.navic.LocalNavStack
@@ -18,7 +19,6 @@ import paige.navic.shared.MediaPlayerViewModel
 import paige.navic.ui.components.dialogs.QueueDuplicateDialog
 import paige.navic.ui.components.sheets.SongSheet
 import paige.navic.ui.screens.playlist.dialogs.PlaylistUpdateDialog
-import paige.navic.utils.UiState
 
 @Composable
 fun CollectionDetailScreenSongRowDropdown(
@@ -30,13 +30,16 @@ fun CollectionDetailScreenSongRowDropdown(
 	collection: DomainSongCollection,
 	song: DomainSong,
 	onRemoveFromPlaylist: () -> Unit,
-	starredState: UiState<Boolean>,
+	starred: Boolean,
 	downloadStatus: DownloadStatus?,
 	isOnline: Boolean,
 	onDownload: () -> Unit,
 	onCancelDownload: () -> Unit,
 	onDeleteDownload: () -> Unit,
+	onPlayNext: () -> Unit,
 	onAddToQueue: () -> Unit,
+	rating: Int,
+	onSetRating: (Int) -> Unit
 ) {
 	val player = koinViewModel<MediaPlayerViewModel>()
 	val backStack = LocalNavStack.current
@@ -48,11 +51,18 @@ fun CollectionDetailScreenSongRowDropdown(
 			onDismissRequest = onDismissRequest,
 			song = song,
 			collection = collection,
-			starred = (starredState as? UiState.Success)?.data,
+			starred = starred,
 			onSetStarred = { starred ->
 				if (starred) onAddStar() else onRemoveStar()
 			},
 			onShare = onShare,
+			onPlayNext = {
+				if (player.uiState.value.queue.any { it.id == song.id }) {
+					duplicateQueueDialogShown = true
+				} else {
+					onPlayNext()
+				}
+			},
 			onAddToQueue = {
 				if (player.uiState.value.queue.any { it.id == song.id }) {
 					duplicateQueueDialogShown = true
@@ -60,11 +70,11 @@ fun CollectionDetailScreenSongRowDropdown(
 					onAddToQueue()
 				}
 			},
-			onTrackInfo = {
+			onTrackInfo = dropUnlessResumed {
 				backStack.add(Screen.SongDetail(song.id))
 			},
 			onViewAlbum = if (collection !is DomainAlbum && song.albumId != null) {
-				{
+				dropUnlessResumed {
 					backStack.add(
 						Screen.CollectionDetail(
 							collectionId = song.albumId,
@@ -73,15 +83,19 @@ fun CollectionDetailScreenSongRowDropdown(
 					)
 				}
 			} else null,
+			onViewArtist = dropUnlessResumed {
+				backStack.add(Screen.ArtistDetail(song.artistId))
+			},
 			onAddToPlaylist = {
 				playlistDialogShown = true
 			},
 			onRemoveFromPlaylist = onRemoveFromPlaylist,
 			downloadStatus = downloadStatus,
-			isOnline = isOnline,
 			onDownload = onDownload,
 			onCancelDownload = onCancelDownload,
-			onDeleteDownload = onDeleteDownload
+			onDeleteDownload = onDeleteDownload,
+			rating = rating,
+			onSetRating = onSetRating
 		)
 	}
 

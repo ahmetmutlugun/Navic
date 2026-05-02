@@ -1,7 +1,6 @@
 package paige.navic.ui.screens.lyrics
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -14,25 +13,16 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.animateScrollBy
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.plus
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,43 +33,56 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.rememberNavigationEventState
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import navic.composeapp.generated.resources.Res
-import navic.composeapp.generated.resources.action_share
+import navic.composeapp.generated.resources.action_navigate_back
+import navic.composeapp.generated.resources.action_share_lyrics
+import navic.composeapp.generated.resources.count_lines
 import navic.composeapp.generated.resources.info_lyrics_provider
 import navic.composeapp.generated.resources.info_no_lyrics
+import navic.composeapp.generated.resources.title_select_lyrics
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
+import paige.navic.LocalNavStack
+import paige.navic.data.models.Screen
 import paige.navic.data.models.settings.Settings
+import paige.navic.data.models.settings.enums.ToolbarPosition
 import paige.navic.domain.models.DomainSong
 import paige.navic.icons.Icons
+import paige.navic.icons.outlined.ArrowBack
 import paige.navic.icons.outlined.Check
-import paige.navic.icons.outlined.Close
+import paige.navic.icons.outlined.KeyboardArrowDown
 import paige.navic.icons.outlined.Lyrics
 import paige.navic.icons.outlined.Share
 import paige.navic.shared.MediaPlayerViewModel
 import paige.navic.ui.components.common.ContentUnavailable
 import paige.navic.ui.components.common.ErrorBox
 import paige.navic.ui.components.common.KeepScreenOn
+import paige.navic.ui.components.layouts.SheetScaffold
+import paige.navic.ui.components.layouts.TopBarButton
+import paige.navic.ui.components.toolbars.SheetToolbar
 import paige.navic.ui.screens.lyrics.components.LyricsScreenKaraokeText
 import paige.navic.ui.screens.lyrics.components.LyricsScreenLoadingView
 import paige.navic.ui.screens.lyrics.dialogs.LyricsShareSheet
 import paige.navic.ui.screens.lyrics.viewmodels.LyricsScreenViewModel
 import paige.navic.utils.UiState
 import paige.navic.utils.calculateWordProgress
-import paige.navic.utils.fadeFromTop
 import kotlin.math.abs
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -88,6 +91,7 @@ import kotlin.time.Duration.Companion.milliseconds
 fun LyricsScreen(
 	song: DomainSong?
 ) {
+	val backStack = LocalNavStack.current
 	val viewModel = koinViewModel<LyricsScreenViewModel>(
 		key = song?.id,
 		parameters = { parametersOf(song) }
@@ -131,7 +135,87 @@ fun LyricsScreen(
 	val spatialSpec = MaterialTheme.motionScheme.slowSpatialSpec<Float>()
 	val effectSpec = MaterialTheme.motionScheme.slowEffectsSpec<Float>()
 
-	Box(modifier = Modifier.fillMaxSize()) {
+	val toggleSelectionMode = {
+		if (isSelectionMode) {
+			isSelectionMode = false
+			selectedIndices.clear()
+			if (wasPlayingBeforeSelection) {
+				player.resume()
+			}
+		} else {
+			wasPlayingBeforeSelection = !playerState.isPaused
+			player.pause()
+			isSelectionMode = true
+		}
+	}
+
+	SheetScaffold(
+		toolbar = { windowInsets ->
+			SheetToolbar(
+				windowInsets = windowInsets,
+				navigationIcon = {
+					TopBarButton(
+						onClick = {
+							if (!isSelectionMode) {
+								backStack.remove(Screen.Lyrics)
+							} else {
+								toggleSelectionMode()
+							}
+						},
+						content = {
+							Icon(
+								imageVector = if (!isSelectionMode)
+									Icons.Outlined.KeyboardArrowDown
+								else Icons.Outlined.ArrowBack,
+								contentDescription = stringResource(Res.string.action_navigate_back)
+							)
+						}
+					)
+					NavigationBackHandler(
+						state = rememberNavigationEventState(NavigationEventInfo.None),
+						isBackEnabled = isSelectionMode,
+						onBackCompleted = toggleSelectionMode
+					)
+				},
+				actions = {
+					TopBarButton(
+						enabled = !isSelectionMode || selectedIndices.isNotEmpty(),
+						onClick = {
+							if (isSelectionMode) {
+								showShareSheet = true
+							} else {
+								toggleSelectionMode()
+							}
+						}
+					) {
+						Icon(
+							imageVector = if (!isSelectionMode)
+								Icons.Outlined.Share
+							else Icons.Outlined.Check,
+							contentDescription = stringResource(Res.string.action_share_lyrics),
+							modifier = Modifier.size(26.dp)
+						)
+					}
+				},
+				title = {
+					if (isSelectionMode) {
+						Column {
+							Text(
+								stringResource(Res.string.title_select_lyrics),
+								fontWeight = FontWeight.SemiBold
+							)
+							Text(pluralStringResource(
+								Res.plurals.count_lines,
+								selectedIndices.count(),
+								selectedIndices.count()
+							))
+						}
+					}
+				}
+			)
+		},
+		toolbarPosition = ToolbarPosition.Top
+	) { contentPadding ->
 		AnimatedContent(
 			state,
 			modifier = Modifier.fillMaxSize(),
@@ -157,16 +241,20 @@ fun LyricsScreen(
 
 				is UiState.Loading -> LyricsScreenLoadingView()
 				is UiState.Success -> {
-					val lyrics = uiState.data?.lines
-					val provider = uiState.data?.provider
+					val data = uiState.data
+					val lyrics = data?.lines
+					val isSynced = data?.isSynced == true
+					val provider = data?.provider
 					val maxSelectionChars = 150
 					fun totalSelectedChars(): Int =
 						selectedIndices.sumOf { lyrics?.getOrNull(it)?.text?.length ?: 0 }
 
 					if (!lyrics.isNullOrEmpty()) {
-						val activeIndex = lyrics.indexOfLast { line ->
-							line.time != null && currentDuration >= line.time
-						}
+						val activeIndex = if (isSynced) {
+							lyrics.indexOfLast { line ->
+								line.time != null && currentDuration >= line.time
+							}
+						} else -1
 
 						LaunchedEffect(activeIndex, isSelectionMode) {
 							if (!lyricsAutoscroll) return@LaunchedEffect
@@ -207,20 +295,19 @@ fun LyricsScreen(
 						}
 
 						LazyColumn(
-							Modifier.fillMaxSize().fadeFromTop(),
+							Modifier.fillMaxSize(),
 							state = listState,
-							contentPadding = WindowInsets.statusBars.asPaddingValues()
-								+ WindowInsets.systemBars.asPaddingValues()
-								+ PaddingValues(vertical = 40.dp)
+							contentPadding = contentPadding
 						) {
 							itemsIndexed(lyrics) { index, line ->
-								val isActive = index == activeIndex
+								val isActive = if (isSynced) index == activeIndex else true
 								val isSelected = selectedIndices.contains(index)
 								val distance = abs(index - activeIndex)
 
 								val blurRadius by animateDpAsState(
 									targetValue = when {
 										isSelectionMode -> 0.dp
+										!isSynced -> 0.dp
 										isActive -> 0.dp
 										distance == 1 -> 1.5.dp
 										distance == 2 -> 3.dp
@@ -245,7 +332,7 @@ fun LyricsScreen(
 								}
 
 								val padding by animateDpAsState(
-									if ((isActive && !isSelectionMode) || (isSelectionMode && isSelected)) 20.dp else 12.dp,
+									if ((isActive && !isSelectionMode && isSynced) || (isSelectionMode && isSelected)) 20.dp else 12.dp,
 									animationSpec = MaterialTheme.motionScheme.slowSpatialSpec()
 								)
 
@@ -255,13 +342,15 @@ fun LyricsScreen(
 								val animatedColor by animateColorAsState(
 									targetColor
 								)
-								val targetScale = if (isActive && !isSelectionMode) 1.05f else 0.98f
+								val targetScale =
+									if (isActive && !isSelectionMode && isSynced) 1.05f else if (!isSynced) 1.0f else 0.98f
 								val animatedScale by animateFloatAsState(
 									targetValue = targetScale,
 									animationSpec = spring(stiffness = Spring.StiffnessLow)
 								)
 
-								val targetOffsetY = if (isActive || isSelectionMode) 0.dp else if (index > activeIndex) 8.dp else (-8).dp
+								val targetOffsetY =
+									if (isActive || isSelectionMode || !isSynced) 0.dp else if (index > activeIndex) 8.dp else (-8).dp
 								val animatedOffsetY by animateDpAsState(
 									targetValue = targetOffsetY,
 									animationSpec = spring(stiffness = Spring.StiffnessLow)
@@ -269,6 +358,8 @@ fun LyricsScreen(
 
 								val highlight = if (isSelectionMode) isSelected else isActive
 								val progress = if (isSelectionMode && isSelected) {
+									1.0f
+								} else if (!isSynced) {
 									1.0f
 								} else if (!isSelectionMode && isActive) {
 									if (line.words.isNullOrEmpty()) {
@@ -362,62 +453,6 @@ fun LyricsScreen(
 					} else {
 						placeholder()
 					}
-				}
-			}
-		}
-		Row(
-			modifier = Modifier
-				.align(Alignment.BottomStart)
-				.padding(12.dp),
-			verticalAlignment = Alignment.CenterVertically,
-			horizontalArrangement = Arrangement.spacedBy(12.dp)
-		) {
-			IconButton(
-				modifier = Modifier
-					.size(48.dp)
-					.background(
-						color = if (isSelectionMode) MaterialTheme.colorScheme.primary else Color.Black.copy(
-							alpha = 0.2f
-						),
-						shape = MaterialTheme.shapes.medium
-					),
-				onClick = {
-					if (isSelectionMode) {
-						isSelectionMode = false
-						selectedIndices.clear()
-						if (wasPlayingBeforeSelection) {
-							player.resume()
-						}
-					} else {
-						wasPlayingBeforeSelection = !playerState.isPaused
-						player.pause()
-						isSelectionMode = true
-					}
-				}) {
-				Icon(
-					imageVector = if (isSelectionMode) Icons.Outlined.Close else Icons.Outlined.Share,
-					contentDescription = null,
-					tint = if (isSelectionMode) MaterialTheme.colorScheme.onPrimary else Color.White
-				)
-			}
-			AnimatedVisibility(
-				visible = isSelectionMode && selectedIndices.isNotEmpty(),
-				enter = scaleIn() + fadeIn(),
-				exit = scaleOut() + fadeOut()
-			) {
-				IconButton(
-					modifier = Modifier
-						.size(48.dp)
-						.background(
-							color = MaterialTheme.colorScheme.onPrimary,
-							shape = MaterialTheme.shapes.medium
-						),
-					onClick = { showShareSheet = true }
-				) {
-					Icon(
-						imageVector = Icons.Outlined.Check,
-						contentDescription = stringResource(Res.string.action_share)
-					)
 				}
 			}
 		}

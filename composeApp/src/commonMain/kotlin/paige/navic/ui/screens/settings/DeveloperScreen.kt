@@ -18,6 +18,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.dropUnlessResumed
 import navic.composeapp.generated.resources.Res
 import navic.composeapp.generated.resources.action_cancel
 import navic.composeapp.generated.resources.action_ok
@@ -41,7 +42,6 @@ import paige.navic.ui.components.common.FormRow
 import paige.navic.ui.components.dialogs.FormDialog
 import paige.navic.ui.components.layouts.NestedTopBar
 import paige.navic.ui.screens.settings.components.SettingSwitchRow
-import paige.navic.utils.fadeFromTop
 
 @Composable
 fun SettingsDeveloperScreen() {
@@ -65,7 +65,6 @@ fun SettingsDeveloperScreen() {
 					.padding(innerPadding)
 					.verticalScroll(rememberScrollState())
 					.padding(top = 16.dp, end = 16.dp, start = 16.dp)
-					.fadeFromTop()
 			) {
 				Form {
 					SettingSwitchRow(
@@ -75,7 +74,7 @@ fun SettingsDeveloperScreen() {
 						onSetValue = { Settings.shared.checkForUpdates = it }
 					)
 					FormRow(
-						onClick = {
+						onClick = dropUnlessResumed {
 							backStack.lastOrNull()?.let {
 								if (it is Screen.Settings.Developer) {
 									backStack.add(Screen.Settings.CustomHeaders)

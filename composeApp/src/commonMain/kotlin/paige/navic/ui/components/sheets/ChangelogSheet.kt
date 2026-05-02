@@ -12,7 +12,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -82,7 +81,15 @@ class ChangelogViewModel(
 				val release: GitHubRelease =
 					updateClient.get("https://api.github.com/repos/paigely/Navic/releases/latest")
 						.body()
-				if (release.tag != currentVersion) release else null
+				val remoteVersion = release.tag
+					.filter { it.isDigit() }
+					.toIntOrNull() ?: return@launch
+				val localVersion = currentVersion
+					.filter { it.isDigit() }
+					.toIntOrNull() ?: return@launch
+				if (remoteVersion > localVersion || "$remoteVersion".length != "$localVersion".length)
+					release
+				else null
 			} catch (e: Exception) {
 				Logger.e("ChangelogViewModel", "couldn't check for updates", e)
 				null

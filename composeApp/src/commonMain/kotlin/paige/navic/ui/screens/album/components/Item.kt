@@ -2,15 +2,26 @@ package paige.navic.ui.screens.album.components
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.dropUnlessResumed
+import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 import paige.navic.LocalCtx
 import paige.navic.LocalNavStack
+import paige.navic.data.database.entities.DownloadStatus
 import paige.navic.data.models.Screen
 import paige.navic.domain.models.DomainAlbum
+import paige.navic.managers.DownloadManager
 import paige.navic.ui.components.layouts.ArtGridItem
 import paige.navic.ui.components.sheets.CollectionSheet
+import paige.navic.ui.screens.playlist.dialogs.PlaylistUpdateDialog
 
 @Composable
 fun AlbumListScreenItem(
@@ -19,18 +30,29 @@ fun AlbumListScreenItem(
 	album: DomainAlbum,
 	selected: Boolean,
 	starred: Boolean,
+	rating: Int,
 	onSelect: () -> Unit,
 	onDeselect: () -> Unit,
 	onSetStarred: (starred: Boolean) -> Unit,
 	onSetShareId: (String) -> Unit,
-	isOnline: Boolean
+	onPlayNext: () -> Unit,
+	onAddToQueue: () -> Unit,
+	onSetRating: (Int) -> Unit
 ) {
 	val ctx = LocalCtx.current
 	val backStack = LocalNavStack.current
 	val scope = rememberCoroutineScope()
+
+	var playlistDialogShown by rememberSaveable { mutableStateOf(false) }
+
+	val downloadManager = koinInject<DownloadManager>()
+	val downloadStatus by downloadManager
+		.getCollectionDownloadStatus(album.songs.map { it.id })
+		.collectAsState(initial = DownloadStatus.NOT_DOWNLOADED)
+
 	Box(modifier) {
 		ArtGridItem(
-			onClick = {
+			onClick = dropUnlessResumed {
 				ctx.clickSound()
 				scope.launch {
 					backStack.add(Screen.CollectionDetail(album.id, tab))
@@ -47,10 +69,41 @@ fun AlbumListScreenItem(
 			CollectionSheet(
 				onDismissRequest = onDeselect,
 				collection = album,
-				isOnline = isOnline,
 				onShare = { onSetShareId(album.id) },
+				onPlayNext = onPlayNext,
+				onAddToQueue = onAddToQueue,
+				downloadStatus = downloadStatus,
+				onDownloadAll = { 
+					scope.launch {
+						downloadManager.downloadCollection(album) 
+					}
+				},
+				onCancelDownloadAll = {
+					scope.launch {
+						album.songs.forEach { downloadManager.cancelDownload(it.id) }
+					}
+				},
+				onDeleteDownloadAll = {
+					scope.launch {
+						downloadManager.deleteDownloadedCollection(album)
+					}
+				},
 				starred = starred,
-				onSetStarred = onSetStarred
+				onSetStarred = onSetStarred,
+				onAddAllToPlaylist = { playlistDialogShown = true },
+				onViewArtist = dropUnlessResumed {
+					backStack.add(Screen.ArtistDetail(album.artistId))
+				},
+				rating = rating,
+				onSetRating = onSetRating
+			)
+		}
+
+		if (playlistDialogShown) {
+			@Suppress("AssignedValueIsNeverRead")
+			PlaylistUpdateDialog(
+				songs = album.songs.orEmpty().toPersistentList(),
+				onDismissRequest = { playlistDialogShown = false }
 			)
 		}
 	}

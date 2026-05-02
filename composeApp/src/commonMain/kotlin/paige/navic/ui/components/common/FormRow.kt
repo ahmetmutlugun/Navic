@@ -21,10 +21,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.dropUnlessResumed
 import com.kyant.capsule.ContinuousRoundedRectangle
 import paige.navic.LocalCtx
 import paige.navic.data.models.settings.Settings
-import paige.navic.utils.onRightClick
 
 @Composable
 fun FormRow(
@@ -45,7 +45,7 @@ fun FormRow(
 				if (onClick != null)
 					Modifier
 						.combinedClickable(
-							onClick = {
+							onClick = dropUnlessResumed {
 								ctx.clickSound()
 								onClick()
 							},
@@ -53,9 +53,6 @@ fun FormRow(
 							interactionSource = interactionSource,
 							indication = null
 						)
-						.onRightClick {
-							onLongClick?.invoke()
-						}
 				else Modifier
 			)
 			.clip(

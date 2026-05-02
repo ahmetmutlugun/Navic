@@ -69,6 +69,9 @@ sealed interface Screen : NavKey {
 	data object Queue : Screen
 	@Immutable
 	@Serializable
+	data object PlaybackSpeed : Screen
+	@Immutable
+	@Serializable
 	data class CollectionDetail(
 		val collectionId: String,
 		val tab: String
@@ -127,5 +130,8 @@ sealed interface Screen : NavKey {
 		@Immutable
 		@Serializable
 		data object CustomHeaders : Settings
+		@Immutable
+		@Serializable
+		data object StreamingQuality : Settings
 	}
 }

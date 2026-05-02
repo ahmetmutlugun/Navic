@@ -45,8 +45,10 @@ import paige.navic.LocalCtx
 import paige.navic.data.models.settings.Settings
 import paige.navic.data.models.settings.enums.BottomBarCollapseMode
 import paige.navic.data.models.settings.enums.BottomBarVisibilityMode
+import paige.navic.domain.models.DomainSongCollection
 import paige.navic.icons.Icons
 import paige.navic.icons.outlined.Add
+import paige.navic.shared.MediaPlayerViewModel
 import paige.navic.ui.components.common.ErrorSnackbar
 import paige.navic.ui.components.dialogs.DeletionDialog
 import paige.navic.ui.components.dialogs.DeletionEndpoint
@@ -71,6 +73,7 @@ fun PlaylistListScreen(
 	nested: Boolean = false
 ) {
 	val viewModel = koinViewModel<PlaylistListViewModel>()
+	val player = koinViewModel<MediaPlayerViewModel>()
 	val playlistsState by viewModel.playlistsState.collectAsState()
 	val selectedPlaylist by viewModel.selectedPlaylist.collectAsState()
 	val selectedSorting by viewModel.selectedSorting.collectAsStateWithLifecycle()
@@ -164,7 +167,9 @@ fun PlaylistListScreen(
 			key = playlistsState
 		) {
 			ArtGrid(
-				modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+				modifier = if (!nested)
+					Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+				else Modifier,
 				state = gridState,
 				contentPadding = innerPadding.withoutTop(),
 				verticalArrangement = if ((playlistsState as? UiState.Success)?.data?.isEmpty() == true)
@@ -181,7 +186,9 @@ fun PlaylistListScreen(
 					},
 					onSetDeletionId = { newDeletionId ->
 						deletionId = newDeletionId
-					}
+					},
+					onPlayNext = { if (selectedPlaylist != null) player.playNext(selectedPlaylist as DomainSongCollection)},
+					onAddToQueue = { if (selectedPlaylist != null) player.addToQueue(selectedPlaylist as DomainSongCollection)}
 				)
 			}
 		}

@@ -38,9 +38,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.dropUnlessResumed
 import com.kyant.capsule.ContinuousRoundedRectangle
 import navic.composeapp.generated.resources.Res
 import navic.composeapp.generated.resources.action_add_to_queue
@@ -65,6 +66,7 @@ import paige.navic.domain.models.DomainAlbum
 import paige.navic.domain.models.DomainAlbumListType
 import paige.navic.domain.models.DomainArtist
 import paige.navic.domain.models.DomainSong
+import paige.navic.domain.models.DomainSongCollection
 import paige.navic.icons.Icons
 import paige.navic.icons.outlined.Close
 import paige.navic.icons.outlined.History
@@ -103,6 +105,9 @@ fun SearchScreen(
 	nested: Boolean
 ) {
 	val viewModel = koinViewModel<SearchViewModel>()
+	val selectedSong by viewModel.selectedSong.collectAsStateWithLifecycle()
+	val selectedSongIsStarred by viewModel.selectedSongIsStarred.collectAsStateWithLifecycle()
+	val selectedSongRating by viewModel.selectedSongRating.collectAsStateWithLifecycle()
 
 	val artistListViewModel = koinViewModel<ArtistListViewModel>()
 	val artistListSelection by artistListViewModel.selectedArtist.collectAsState()
@@ -113,6 +118,7 @@ fun SearchScreen(
 	}
 	val albumListSelection by albumListViewModel.selectedAlbum.collectAsState()
 	val albumListStarred by albumListViewModel.starred.collectAsState()
+	val selectedAlbumRating by albumListViewModel.rating.collectAsStateWithLifecycle()
 
 	val query = viewModel.searchQuery
 	val state by viewModel.searchState.collectAsState()
@@ -125,7 +131,6 @@ fun SearchScreen(
 	val backStack = LocalNavStack.current
 
 	var selectedCategory by remember { mutableStateOf(SearchCategory.ALL) }
-	var selectedSong by remember { mutableStateOf<DomainSong?>(null) }
 	var songToQueue by remember { mutableStateOf<DomainSong?>(null) }
 
 	Scaffold(
@@ -216,6 +221,7 @@ fun SearchScreen(
 									SwipeToDismissBox(
 										state = dismissState,
 										enableDismissFromStartToEnd = false,
+										enableDismissFromEndToStart = true,
 										backgroundContent = {
 											val backgroundColor by animateColorAsState(
 												targetValue = when (dismissState.targetValue) {
@@ -245,73 +251,79 @@ fun SearchScreen(
 											}
 										}
 									) {
-										Box {
-											ListItem(
-												modifier = Modifier.alpha(if (canPlay) 1f else 0.75f),
-												enabled = canPlay,
-												onClick = {
-													ctx.clickSound()
-													player.clearQueue()
-													player.addToQueueSingle(song)
-													player.playAt(0)
-												},
-												onLongClick = {
-													selectedSong = song
-												},
-												content = { Text(song.title) },
-												supportingContent = {
-													MarqueeText(
-														"${song.albumTitle ?: ""} • ${song.artistName} • ${song.year ?: ""}"
-													)
-												},
-												leadingContent = {
-													CoverArt(
-														coverArtId = song.coverArtId,
-														modifier = Modifier.size(50.dp),
-														shape = ContinuousRoundedRectangle((Settings.shared.artGridRounding / 1.75f).dp)
-													)
-												},
-												trailingContent = {
-													if (!canPlay) {
-														Icon(
-															Icons.Outlined.Offline,
-															stringResource(Res.string.info_not_available_offline),
-															modifier = Modifier.size(20.dp)
-														)
-													}
-												}
-											)
-											if (selectedSong == song) {
-												SongSheet(
-													onDismissRequest = { selectedSong = null },
-													song = song,
-													onAddToQueue = {
-														if (player.uiState.value.queue.any { it.id == song.id }) {
-															songToQueue = song
-														} else {
-															player.addToQueueSingle(song)
-														}
-													},
-													isOnline = isOnline,
-													downloadStatus = if (downloadedSongs.containsKey(
-															song.id
-														)
-													) DownloadStatus.DOWNLOADED else null,
-													onTrackInfo = {
-														backStack.add(Screen.SongDetail(song.id))
-													},
-													onViewAlbum = song.albumId?.let { albumId ->
-														{
-															backStack.add(
-																Screen.CollectionDetail(
-																	collectionId = albumId,
-																	tab = "search"
-																)
-															)
-														}
-													}
+										ListItem(
+											modifier = Modifier
+												.background(MaterialTheme.colorScheme.surface),
+											onClick = {
+												ctx.clickSound()
+												player.clearQueue()
+												player.addToQueueSingle(song)
+												player.playAt(0)
+											},
+											onLongClick = { viewModel.selectSong(song) },
+											content = { Text(song.title) },
+											supportingContent = {
+												MarqueeText(
+													"${song.albumTitle ?: ""} • ${song.artistName} • ${song.year ?: ""}"
 												)
+											},
+											leadingContent = {
+												CoverArt(
+													coverArtId = song.coverArtId,
+													modifier = Modifier.size(50.dp),
+													shape = ContinuousRoundedRectangle((Settings.shared.artGridRounding / 1.75f).dp)
+												)
+											},
+											trailingContent = {
+												if (!canPlay) {
+													Icon(
+														Icons.Outlined.Offline,
+														stringResource(Res.string.info_not_available_offline),
+														modifier = Modifier.size(20.dp)
+													)
+												}
 											}
+										)
+										if (selectedSong == song) {
+											SongSheet(
+												onDismissRequest = { viewModel.clearSelectedSong() },
+												song = song,
+												onPlayNext = {
+													if (player.uiState.value.queue.any { it.id == song.id }) {
+														songToQueue = song
+													} else {
+														player.playNextSingle(song)
+													}
+												},
+												onAddToQueue = {
+													if (player.uiState.value.queue.any { it.id == song.id }) {
+														songToQueue = song
+													} else {
+														player.addToQueueSingle(song)
+													}
+												},
+												downloadStatus = if (downloadedSongs.containsKey(
+														song.id
+													)
+												) DownloadStatus.DOWNLOADED else null,
+												onTrackInfo = dropUnlessResumed {
+													backStack.add(Screen.SongDetail(song.id))
+												},
+												onViewAlbum = song.albumId?.let { albumId ->
+													dropUnlessResumed {
+														backStack.add(
+															Screen.CollectionDetail(
+																collectionId = albumId,
+																tab = "search"
+															)
+														)
+													}
+												},
+												starred = selectedSongIsStarred,
+												onSetStarred = { viewModel.starSelectedSong(it) },
+												rating = selectedSongRating,
+												onSetRating = { viewModel.rateSelectedSong(it) }
+											)
 										}
 									}
 								}
@@ -335,7 +347,10 @@ fun SearchScreen(
 									onDeselect = { albumListViewModel.clearSelection() },
 									onSetStarred = { albumListViewModel.starAlbum(it) },
 									onSetShareId = { },
-									isOnline = isOnline
+									onPlayNext = { player.playNext(album as DomainSongCollection)},
+									onAddToQueue = { player.addToQueue(album as DomainSongCollection)},
+									rating = selectedAlbumRating,
+									onSetRating = { albumListViewModel.setRating(it) }
 								)
 							}
 

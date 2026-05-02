@@ -19,12 +19,17 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import paige.navic.data.models.settings.Settings
 import paige.navic.ui.screens.nowPlaying.components.controls.NowPlayingProgressBar
 
 @Composable
 fun NowPlayingControlsRow(
 	modifier: Modifier = Modifier,
-	isLandscape: Boolean
+	isLandscape: Boolean,
+	songIsStarred: Boolean,
+	onSetSongIsStarred: (Boolean) -> Unit,
+	songRating: Int,
+	onSetSongRating: (Int) -> Unit
 ) {
 	var visible by rememberSaveable { mutableStateOf(false) }
 	val scale by animateFloatAsState(if (visible) 1f else 0f)
@@ -41,9 +46,17 @@ fun NowPlayingControlsRow(
 		verticalArrangement = Arrangement.Center
 	) {
 		Column {
-			NowPlayingInfoRow()
+			NowPlayingInfoRow(
+				songIsStarred = songIsStarred,
+				onSetSongIsStarred = onSetSongIsStarred,
+				songRating = songRating,
+				onSetSongRating = onSetSongRating
+			)
 			NowPlayingProgressBar()
 			NowPlayingDurationsRow()
+			if (Settings.shared.nowPlayingSongInfo) {
+				NowPlayingTechnicalInfoRow()
+			}
 		}
 		Spacer(modifier = Modifier.height(if (isLandscape) 24.dp else 30.dp))
 		NowPlayingButtonsRow()

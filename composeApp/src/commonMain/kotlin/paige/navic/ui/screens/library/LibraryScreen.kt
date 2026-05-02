@@ -23,6 +23,8 @@ import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 import paige.navic.domain.models.DomainAlbumListType
+import paige.navic.domain.models.DomainSongCollection
+import paige.navic.shared.MediaPlayerViewModel
 import paige.navic.ui.components.common.ErrorSnackbar
 import paige.navic.ui.components.dialogs.DeletionDialog
 import paige.navic.ui.components.dialogs.DeletionEndpoint
@@ -52,6 +54,7 @@ fun LibraryScreen() {
 	val albumsState by albumsViewModel.albumsState.collectAsStateWithLifecycle()
 	val selectedAlbum by albumsViewModel.selectedAlbum.collectAsStateWithLifecycle()
 	val selectedAlbumIsStarred by albumsViewModel.starred.collectAsStateWithLifecycle()
+	val selectedAlbumRating by albumsViewModel.rating.collectAsStateWithLifecycle()
 
 	val playlistsViewModel = koinViewModel<PlaylistListViewModel>()
 	val playlistsState by playlistsViewModel.playlistsState.collectAsStateWithLifecycle()
@@ -73,7 +76,8 @@ fun LibraryScreen() {
 	var playlistDeletionId by rememberSaveable { mutableStateOf<String?>(null) }
 	var playlistCreateDialogShown by rememberSaveable { mutableStateOf(false) }
 
-	val isOnline by albumsViewModel.isOnline.collectAsStateWithLifecycle()
+	val player = koinViewModel<MediaPlayerViewModel>()
+
 	val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
 	LaunchedEffect(loginState is LoginState.Success) {
@@ -95,9 +99,9 @@ fun LibraryScreen() {
 				.padding(top = innerPadding.calculateTopPadding())
 				.background(MaterialTheme.colorScheme.surface),
 			finished = albumsState !is UiState.Loading &&
-					playlistsState !is UiState.Loading &&
-					artistsState !is UiState.Loading &&
-					genresState !is UiState.Loading,
+				playlistsState !is UiState.Loading &&
+				artistsState !is UiState.Loading &&
+				genresState !is UiState.Loading,
 			onRefresh = {
 				albumsViewModel.refreshAlbums(true)
 				playlistsViewModel.refreshPlaylists(true)
@@ -110,14 +114,17 @@ fun LibraryScreen() {
 				scrollBehavior = scrollBehavior,
 				innerPadding = innerPadding,
 				onSetShareId = { shareId = it },
-				isOnline = isOnline,
 
 				albumsState = albumsState,
 				selectedAlbum = selectedAlbum,
 				selectedAlbumIsStarred = selectedAlbumIsStarred,
+				selectedAlbumRating = selectedAlbumRating,
 				onSelectAlbum = { albumsViewModel.selectAlbum(it) },
 				onClearAlbumSelection = { albumsViewModel.clearSelection() },
 				onStarSelectedAlbum = { albumsViewModel.starAlbum(it) },
+				onPlayAlbumNext = { if (selectedAlbum != null) player.playNext(selectedAlbum as DomainSongCollection)},
+				onAddAlbumToQueue = { if (selectedAlbum != null) player.addToQueue(selectedAlbum as DomainSongCollection)},
+				onRateSelectedAlbum = { albumsViewModel.setRating(it) },
 
 				artistsState = artistsState,
 				selectedArtist = selectedArtist,
@@ -131,6 +138,8 @@ fun LibraryScreen() {
 				onSelectPlaylist = { playlistsViewModel.selectPlaylist(it) },
 				onClearPlaylistSelection = { playlistsViewModel.clearSelection() },
 				onDeletePlaylist = { playlistDeletionId = it },
+				onPlayPlaylistNext = { if (selectedPlaylist != null) player.playNext(selectedPlaylist as DomainSongCollection)},
+				onAddPlaylistToQueue = { if (selectedPlaylist != null) player.addToQueue(selectedPlaylist as DomainSongCollection)},
 
 				genresState = genresState
 			)

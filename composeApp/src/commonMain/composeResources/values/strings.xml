@@ -35,6 +35,7 @@
 	<string name="title_fonts_inbuilt">In-built</string>
 	<string name="title_fonts_external">External</string>
 	<string name="title_more_by_artist">More by %1$s</string>
+	<string name="title_disc_number">Disc %1$s</string>
 	<string name="title_genres">Genres</string>
 	<string name="title_navigation_bar">Navigation Bar</string>
 	<string name="title_mini_player">Mini Player</string>
@@ -43,9 +44,15 @@
 	<string name="title_sort_by">Sort by</string>
 	<string name="title_direction">Direction</string>
 	<string name="title_bulk_download">Download All Albums</string>
+	<string name="title_library_download">Download Entire Library</string>
 	<string name="title_confirm">Confirm</string>
 	<string name="title_update">Update available</string>
 	<string name="title_changelog">Release notes</string>
+	<string name="title_network">Network</string>
+	<string name="title_streaming_quality">Streaming quality</string>
+	<string name="title_wifi">Wi-Fi</string>
+	<string name="title_cellular">Cellular</string>
+	<string name="title_select_lyrics">Select Lyrics</string>
 
 	<string name="subtitle_appearance">Themes, colours, layout</string>
 	<string name="subtitle_now_playing">Customise the fullscreen now playing view</string>
@@ -62,14 +69,19 @@
 	<string name="subtitle_audio_offload">Experimental. Requires application restart. May conflict with gapless playback on some devices</string>
 	<string name="subtitle_now_playing_background_style">Choose static if you have performance issues</string>
 	<string name="subtitle_check_for_updates">It is recommended to leave this on, as some updates provide important bug fixes</string>
+	<string name="subtitle_offline_mode">Dictates when the app should go in an offline mode. Requires application restart</string>
+	<string name="subtitle_streaming_quality">Adjust the quality of streamed music</string>
 
 	<string name="option_now_playing_background_style">Background style</string>
 	<string name="option_now_playing_background_style_static">Static</string>
 	<string name="option_now_playing_background_style_dynamic">Dynamic</string>
 	<string name="option_accent_colour">Accent colour</string>
+	<string name="option_now_playing_song_info">Show technical song info</string>
 	<string name="option_now_playing_slider_style">Slider style</string>
 	<string name="option_now_playing_slider_style_flat">Flat</string>
 	<string name="option_now_playing_slider_style_squiggly">Squiggly</string>
+	<string name="option_now_playing_slider_style_slim">Slim</string>
+	<string name="option_now_playing_slider_style_yoyo">Yoyo</string>
 	<string name="option_swipe_to_skip">Swipe to change songs</string>
 	<string name="option_artwork_shape">Artwork shape</string>
 	<string name="option_cover_art_size">Cover artwork size</string>
@@ -88,7 +100,7 @@
 	<string name="option_lyrics_beat_by_beat">Beat-by-beat lyrics</string>
 	<string name="option_sort_random">Random</string>
 	<string name="option_sort_newest">Recently added</string>
-	<string name="option_sort_highest">Highest</string>
+	<string name="option_sort_rating">Rating</string>
 	<string name="option_sort_frequent">Frequently played</string>
 	<string name="option_sort_recent">Recently played</string>
 	<string name="option_sort_downloaded">Downloaded</string>
@@ -121,15 +133,32 @@
 	<string name="option_radio_name">Name</string>
 	<string name="option_radio_stream_url">Stream URL</string>
 	<string name="option_radio_homepage_url">Homepage URL</string>
+	<string name="option_offline_mode">Offline mode</string>
+	<string name="option_offline_mode_auto">Auto</string>
+	<string name="option_offline_mode_forced">Forced</string>
+	<string name="option_offline_mode_no_wifi">No Wi-Fi</string>
+	<string name="option_animation_style">Animation style</string>
+	<string name="option_animation_style_expressive">Expressive</string>
+	<string name="option_animation_style_standard">Standard</string>
+	<string name="option_quality_low">Low</string>
+	<string name="option_quality_medium">Medium</string>
+	<string name="option_quality_high">High</string>
+	<string name="option_quality_lossless">Lossless (no transcoding)</string>
 
 	<string name="info_status_idle">Idle</string>
 	<string name="info_status_calculating">Calculating...</string>
+	<string name="info_status_downloading">Downloading in progress...</string>
 	<string name="info_sync_never">Never</string>
 	<string name="info_sync_just_now">Just now</string>
 	<string name="info_sync_mins_ago">%1$d m ago</string>
 	<string name="info_sync_hours_ago">%1$d h ago</string>
 	<string name="info_sync_date_format">%1$d %2$s</string>
 	<string name="info_bulk_download_warning">Are you sure you want to download every album by %1$s?\nThis may require a significant amount of storage and data.</string>
+	<string name="info_library_download_warning">Are you sure you want to download your entire library? \nThis will skip items you've already downloaded, but it may still consume a significant amount of storage space and data.</string>
+	<string name="info_library_download">Save all synced music for offline playback</string>
+	<string name="info_progress">Progress</string>
+	<string name="info_in_use">(in use)</string>
+	<string name="info_explicit">Explicit</string>
 
 	<string name="option_now_playing_toolbar_position">Toolbar position</string>
 	<string name="option_position_top">Top</string>
@@ -146,6 +175,9 @@
 	<string name="option_navigation_bar_style">Navigation bar style</string>
 	<string name="option_navigation_bar_style_normal">Normal</string>
 	<string name="option_navigation_bar_style_short">Short</string>
+	<string name="option_navigation_bar_label_visibility">Label visibility</string>
+	<string name="option_navigation_bar_label_visibility_always">Always</string>
+	<string name="option_navigation_bar_label_visibility_only_selected">Only selected</string>
 	<string name="option_navigation_bar_tabs">Reorder navigation bar tabs</string>
 
 	<string name="option_mini_player_style">Mini player style</string>
@@ -201,6 +233,16 @@
 		<item quantity="other">%1$d hours</item>
 	</plurals>
 
+	<plurals name="count_rate_stars">
+		<item quantity="one">Rate %1$d star</item>
+		<item quantity="other">Rate %1$d stars</item>
+	</plurals>
+
+	<plurals name="count_lines">
+		<item quantity="one">%1$d line selected</item>
+		<item quantity="other">%1$d lines selected</item>
+	</plurals>
+
 	<string name="action_ok">OK</string>
 	<string name="action_play">Play</string>
 	<string name="action_new">New</string>
@@ -222,6 +264,7 @@
 	<string name="action_sleep_timer">Sleep timer</string>
 	<string name="action_sleep_timer_enabled">Sleep timer - %1$s left </string>
 	<string name="action_disable_sleep_timer">Turn off timer</string>
+	<string name="option_playback_speed">Playback speed</string>
 	<string name="action_navigate_back">Back</string>
 	<string name="action_log_out">Logout</string>
 	<string name="action_log_in">Log in</string>
@@ -238,6 +281,7 @@
 	<string name="action_lyrics">Lyrics</string>
 	<string name="action_share_lyrics">Share Lyrics</string>
 	<string name="action_update_app">Update</string>
+	<string name="action_play_next">Play next</string>
 	<string name="action_add_to_queue">Add to Queue</string>
 	<string name="action_queue">Queue</string>
 	<string name="action_reorder">Reorder</string>
@@ -324,6 +368,7 @@
 	<string name="info_login_description_middle">Navidrome</string>
 	<string name="info_login_description_end">instance.</string>
 	<string name="info_exception_handler">This will immediately crash the application. Are you sure?</string>
+	<string name="info_streaming_quality">Higher quality presets will use more data. Transcoding can severely impact load times and cause lyrics to become unsynced. Select Lossless if you encounter any issues.</string>
 
 	<string name="sideloading_warning_title">STOP, READ!</string>
 	<string name="sideloading_warning_subtitle">Google is planning to kill sideloading for ALL devices with Google Play Services installed!\n</string>

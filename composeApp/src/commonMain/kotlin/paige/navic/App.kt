@@ -44,12 +44,14 @@ import androidx.navigation3.ui.NavDisplay.predictivePopTransitionSpec
 import androidx.navigation3.ui.NavDisplay.transitionSpec
 import androidx.savedstate.serialization.SavedStateConfiguration
 import coil3.compose.LocalPlatformContext
+import coil3.compose.setSingletonImageLoaderFactory
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import org.koin.compose.viewmodel.koinViewModel
+import paige.navic.data.images.initializeSingletonImageLoader
 import paige.navic.data.models.Screen
 import paige.navic.data.models.settings.Settings
 import paige.navic.data.session.SessionManager
@@ -58,7 +60,6 @@ import paige.navic.shared.MediaPlayerViewModel
 import paige.navic.shared.rememberCtx
 import paige.navic.ui.components.dialogs.SideloadingDialog
 import paige.navic.ui.components.sheets.ChangelogSheet
-import paige.navic.ui.navigation.Material3Transitions
 import paige.navic.ui.scenes.BottomSheetSceneStrategy
 import paige.navic.ui.scenes.NowPlayingSceneStrategy
 import paige.navic.ui.screens.album.AlbumListScreen
@@ -67,9 +68,10 @@ import paige.navic.ui.screens.artist.ArtistListScreen
 import paige.navic.ui.screens.collection.CollectionDetailScreen
 import paige.navic.ui.screens.genre.GenreListScreen
 import paige.navic.ui.screens.library.LibraryScreen
+import paige.navic.ui.screens.login.LoginScreen
 import paige.navic.ui.screens.lyrics.LyricsScreen
 import paige.navic.ui.screens.nowPlaying.NowPlayingScreen
-import paige.navic.ui.screens.login.LoginScreen
+import paige.navic.ui.screens.nowPlaying.PlaybackSpeedScreen
 import paige.navic.ui.screens.playlist.PlaylistListScreen
 import paige.navic.ui.screens.queue.QueueScreen
 import paige.navic.ui.screens.radio.RadioListScreen
@@ -85,12 +87,14 @@ import paige.navic.ui.screens.settings.SettingsDeveloperScreen
 import paige.navic.ui.screens.settings.SettingsNowPlayingScreen
 import paige.navic.ui.screens.settings.SettingsPlaybackScreen
 import paige.navic.ui.screens.settings.SettingsScreen
+import paige.navic.ui.screens.settings.SettingsStreamingQualityScreen
 import paige.navic.ui.screens.share.ShareListScreen
 import paige.navic.ui.screens.song.SongDetailScreen
 import paige.navic.ui.screens.song.SongListScreen
 import paige.navic.ui.theme.NavicTheme
 import paige.navic.utils.BottomBarScrollManager
 import paige.navic.utils.LocalBottomBarScrollManager
+import paige.navic.utils.Material3Transitions
 
 @OptIn(ExperimentalSerializationApi::class)
 private val config = SavedStateConfiguration {
@@ -112,6 +116,11 @@ val LocalSharedTransitionScope =
 @Composable
 fun App() {
 	val platformContext = LocalPlatformContext.current
+
+	setSingletonImageLoaderFactory { platformContext ->
+		initializeSingletonImageLoader(platformContext)
+	}
+
 	val ctx = rememberCtx()
 	val backStack = rememberNavBackStack(
 		config, if (SessionManager.currentUser != null) {
@@ -166,7 +175,11 @@ fun App() {
 							remember { BottomSheetSceneStrategy() },
 							rememberListDetailSceneStrategy()
 						),
-						onBack = backStack::removeLastOrNull,
+						onBack = {
+							if (backStack.size > 1) {
+								backStack.removeLastOrNull()
+							}
+						},
 						entryProvider = entryProvider(backStack),
 						transitionSpec = {
 							Material3Transitions.SharedXAxisEnterTransition(density) togetherWith Material3Transitions.SharedXAxisExitTransition(
@@ -255,6 +268,9 @@ private fun entryProvider(
 		entry<Screen.Queue>(metadata = BottomSheetSceneStrategy.bottomSheet()) {
 			QueueScreen()
 		}
+		entry<Screen.PlaybackSpeed>(metadata = BottomSheetSceneStrategy.bottomSheet()) {
+			PlaybackSpeedScreen()
+		}
 		entry<Screen.CollectionDetail>(metadata = detailPane("root")) { key ->
 			CollectionDetailScreen(key.collectionId, key.tab)
 		}
@@ -304,6 +320,9 @@ private fun entryProvider(
 		}
 		entry<Screen.Settings.CustomHeaders> {
 			SettingsCustomHeadersScreen()
+		}
+		entry<Screen.Settings.StreamingQuality> {
+			SettingsStreamingQualityScreen()
 		}
 	}
 }

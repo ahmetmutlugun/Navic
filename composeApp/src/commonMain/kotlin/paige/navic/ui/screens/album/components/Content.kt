@@ -18,11 +18,14 @@ fun LazyGridScope.albumListScreenContent(
 	state: UiState<List<DomainAlbum>>,
 	starred: Boolean,
 	selectedAlbum: DomainAlbum?,
+	selectedAlbumRating: Int,
 	onUpdateSelection: (DomainAlbum) -> Unit,
 	onClearSelection: () -> Unit,
 	onSetShareId: (String) -> Unit,
 	onSetStarred: (Boolean) -> Unit,
-	isOnline: Boolean
+	onPlayNext: () -> Unit,
+	onAddToQueue: () -> Unit,
+	onRateSelectedAlbum: (Int) -> Unit
 ) {
 	val data = state.data.orEmpty()
 	if (data.isNotEmpty()) {
@@ -37,7 +40,10 @@ fun LazyGridScope.albumListScreenContent(
 				onDeselect = { onClearSelection() },
 				onSetStarred = { onSetStarred(it) },
 				onSetShareId = onSetShareId,
-				isOnline = isOnline
+				onPlayNext = onPlayNext,
+				onAddToQueue = onAddToQueue,
+				rating = selectedAlbumRating,
+				onSetRating = onRateSelectedAlbum
 			)
 		}
 	} else {

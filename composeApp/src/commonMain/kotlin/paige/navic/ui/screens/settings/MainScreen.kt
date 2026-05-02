@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.dropUnlessResumed
 import navic.composeapp.generated.resources.Res
 import navic.composeapp.generated.resources.subtitle_about
 import navic.composeapp.generated.resources.subtitle_appearance
@@ -55,7 +56,6 @@ import paige.navic.ui.components.common.Form
 import paige.navic.ui.components.common.FormRow
 import paige.navic.ui.components.layouts.NestedTopBar
 import paige.navic.ui.theme.defaultFont
-import paige.navic.utils.fadeFromTop
 
 @Composable
 fun SettingsScreen() {
@@ -67,7 +67,6 @@ fun SettingsScreen() {
 				.padding(innerPadding)
 				.verticalScroll(rememberScrollState())
 				.padding(top = 16.dp, end = 16.dp, start = 16.dp)
-				.fadeFromTop()
 		) {
 			Form {
 				PageRow(
@@ -136,7 +135,7 @@ private fun PageRow(
 ) {
 	val backStack = LocalNavStack.current
 	FormRow(
-		onClick = {
+		onClick = dropUnlessResumed {
 			destination?.let { destination ->
 				backStack.lastOrNull()?.let {
 					if (it is Screen.Settings) {

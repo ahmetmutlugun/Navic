@@ -5,26 +5,36 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.dropUnlessResumed
 import navic.composeapp.generated.resources.Res
 import navic.composeapp.generated.resources.info_not_playing
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import paige.navic.LocalNavStack
 import paige.navic.data.models.Screen
+import paige.navic.domain.models.DomainExplicitStatus
 import paige.navic.shared.MediaPlayerViewModel
 import paige.navic.ui.components.common.MarqueeText
 import paige.navic.ui.screens.nowPlaying.components.controls.NowPlayingMoreButton
 import paige.navic.ui.screens.nowPlaying.components.controls.NowPlayingStarButton
+import paige.navic.utils.InlineExplicitIconLarge
 
 @Composable
-fun NowPlayingInfoRow() {
+fun NowPlayingInfoRow(
+	songIsStarred: Boolean,
+	onSetSongIsStarred: (Boolean) -> Unit,
+	songRating: Int,
+	onSetSongRating: (Int) -> Unit
+) {
 	val backStack = LocalNavStack.current
 	val player = koinViewModel<MediaPlayerViewModel>()
 	val playerState by player.uiState.collectAsState()
@@ -37,10 +47,17 @@ fun NowPlayingInfoRow() {
 		horizontalArrangement = Arrangement.spacedBy(8.dp)
 	) {
 		Column(Modifier.weight(1f)) {
-			song?.title?.let { title ->
+			song?.let { song ->
 				MarqueeText(
-					title,
-					modifier = Modifier.clickable {
+					text = buildAnnotatedString {
+						append(song.title)
+						if (song.explicitStatus == DomainExplicitStatus.Explicit) {
+							append(" ")
+							appendInlineContent("InlineExplicitIcon")
+						}
+					},
+					inlineContent = InlineExplicitIconLarge,
+					modifier = Modifier.clickable(onClick = dropUnlessResumed {
 						song.albumId?.let {
 							backStack.removeLastOrNull()
 
@@ -55,12 +72,12 @@ fun NowPlayingInfoRow() {
 							if (!isSameAlbum)
 								backStack.add(
 									Screen.CollectionDetail(
-										playerState.currentCollection?.id ?: return@clickable,
+										playerState.currentCollection?.id ?: return@dropUnlessResumed,
 										""
 									)
 								)
 						}
-					},
+					}),
 					style = MaterialTheme.typography.bodyLarge
 						.copy(
 							fontSize = MaterialTheme.typography.bodyLarge.fontSize * 1.1
@@ -68,12 +85,15 @@ fun NowPlayingInfoRow() {
 				)
 			}
 			MarqueeText(
-				modifier = Modifier.clickable(song != null) {
-					song?.artistId?.let { id ->
-						backStack.remove(Screen.NowPlaying)
-						backStack.add(Screen.ArtistDetail(id))
+				modifier = Modifier.clickable(
+					song != null,
+					onClick = dropUnlessResumed {
+						song?.artistId?.let { id ->
+							backStack.remove(Screen.NowPlaying)
+							backStack.add(Screen.ArtistDetail(id))
+						}
 					}
-				},
+				),
 				style = MaterialTheme.typography.bodyMedium
 					.copy(
 						color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -85,8 +105,14 @@ fun NowPlayingInfoRow() {
 		Row(
 			horizontalArrangement = Arrangement.spacedBy(10.dp)
 		) {
-			NowPlayingStarButton()
-			NowPlayingMoreButton()
+			NowPlayingStarButton(
+				songIsStarred = songIsStarred,
+				onSetSongIsStarred = onSetSongIsStarred
+			)
+			NowPlayingMoreButton(
+				songRating = songRating,
+				onSetSongRating = onSetSongRating
+			)
 		}
 	}
 }

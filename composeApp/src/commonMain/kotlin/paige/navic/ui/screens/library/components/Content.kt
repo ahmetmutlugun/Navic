@@ -47,15 +47,16 @@ fun LibraryScreenContent(
 	scrollBehavior: TopAppBarScrollBehavior,
 	innerPadding: PaddingValues,
 	onSetShareId: (String) -> Unit,
-	isOnline: Boolean,
 
 	// albums
 	albumsState: UiState<ImmutableList<DomainAlbum>>,
 	selectedAlbum: DomainAlbum?,
 	selectedAlbumIsStarred: Boolean,
+	selectedAlbumRating: Int,
 	onSelectAlbum: (DomainAlbum) -> Unit,
 	onClearAlbumSelection: () -> Unit,
 	onStarSelectedAlbum: (Boolean) -> Unit,
+	onRateSelectedAlbum: (Int) -> Unit,
 
 	// artists
 	artistsState: UiState<ImmutableList<DomainArtist>>,
@@ -64,6 +65,8 @@ fun LibraryScreenContent(
 	onSelectArtist: (DomainArtist) -> Unit,
 	onClearArtistSelection: () -> Unit,
 	onStarSelectedArtist: (Boolean) -> Unit,
+	onPlayAlbumNext: () -> Unit,
+	onAddAlbumToQueue: () -> Unit,
 
 	// playlists
 	playlistsState: UiState<ImmutableList<DomainPlaylist>>,
@@ -71,6 +74,8 @@ fun LibraryScreenContent(
 	onSelectPlaylist: (DomainPlaylist) -> Unit,
 	onClearPlaylistSelection: () -> Unit,
 	onDeletePlaylist: (String) -> Unit,
+	onPlayPlaylistNext: () -> Unit,
+	onAddPlaylistToQueue: () -> Unit,
 
 	// genres
 	genresState: UiState<ImmutableList<DomainGenre>>
@@ -124,7 +129,10 @@ fun LibraryScreenContent(
 				onDeselect = { onClearAlbumSelection() },
 				onSetStarred = { onStarSelectedAlbum(it) },
 				onSetShareId = { onSetShareId(it) },
-				isOnline = isOnline
+				onPlayNext = onPlayAlbumNext,
+				onAddToQueue = onAddAlbumToQueue,
+				rating = selectedAlbumRating,
+				onSetRating = onRateSelectedAlbum
 			)
 		}
 
@@ -143,7 +151,9 @@ fun LibraryScreenContent(
 				onSelect = { onSelectPlaylist(playlist) },
 				onDeselect = { onClearPlaylistSelection() },
 				onSetDeletionId = { onDeletePlaylist(it) },
-				onSetShareId = { onSetShareId(it) }
+				onSetShareId = { onSetShareId(it) },
+				onPlayNext = onPlayPlaylistNext,
+				onAddToQueue = onAddPlaylistToQueue
 			)
 		}
 

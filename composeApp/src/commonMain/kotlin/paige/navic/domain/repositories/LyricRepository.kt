@@ -2,6 +2,7 @@ package paige.navic.domain.repositories
 
 import com.russhwolf.settings.Settings
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.accept
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
@@ -14,6 +15,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import paige.navic.data.database.dao.LyricDao
+import paige.navic.data.database.entities.LyricEntity
 import paige.navic.data.session.SessionManager
 import paige.navic.domain.models.DomainSong
 import paige.navic.shared.Logger
@@ -34,7 +36,9 @@ data class LyricsResult(
 	val lines: List<LyricLine>,
 	val provider: LyricsProvider,
 	val rawContent: String? = null
-)
+) {
+	val isSynced: Boolean = lines.any { it.time != null }
+}
 
 @Serializable
 enum class LyricsProvider(
@@ -109,24 +113,24 @@ object LyricsContentParser {
 	private fun parseJson(jsonString: String): List<LyricLine>? {
 		val jsonObject = jsonParser.parseToJsonElement(jsonString).jsonObject
 
-		return when {
-			jsonObject.containsKey("syncedLyrics") -> {
-				val syncedStr = jsonObject["syncedLyrics"]?.jsonPrimitive?.contentOrNull
-				if (!syncedStr.isNullOrEmpty()) parseLrc(syncedStr) else null
-			}
-
-			jsonObject.containsKey("plainLyrics") -> {
-				val plainStr = jsonObject["plainLyrics"]?.jsonPrimitive?.contentOrNull
-				plainStr?.lineSequence()?.map { LyricLine(text = it) }?.toList()
-			}
-
-			jsonObject.containsKey("lyrics") -> {
-				val youlyResponse = jsonParser.decodeFromString<YoulyResponse>(jsonString)
-				parseYoulyResponse(youlyResponse)
-			}
-
-			else -> null
+		val syncedStr = jsonObject["syncedLyrics"]?.jsonPrimitive?.contentOrNull
+		if (!syncedStr.isNullOrEmpty()) {
+			return parseLrc(syncedStr)
 		}
+
+		val plainStr = jsonObject["plainLyrics"]?.jsonPrimitive?.contentOrNull
+		if (!plainStr.isNullOrEmpty()) {
+			return plainStr.lineSequence()
+				.map { LyricLine(text = it.trim()) }
+				.toList()
+		}
+
+		if (jsonObject.containsKey("lyrics")) {
+			val youlyResponse = jsonParser.decodeFromString<YoulyResponse>(jsonString)
+			return parseYoulyResponse(youlyResponse)
+		}
+
+		return null
 	}
 
 	private fun parseYoulyResponse(response: YoulyResponse): List<LyricLine>? {
@@ -184,10 +188,16 @@ object LyricsContentParser {
 
 class LyricRepository(
 	private val lyricDao: LyricDao,
-	private val client: HttpClient,
 	private val settings: Settings
 ) {
 
+	private val client = HttpClient {
+		install(HttpTimeout) {
+			requestTimeoutMillis = 40000
+			connectTimeoutMillis = 40000
+			socketTimeoutMillis = 40000
+		}
+	}
 	private val json = Json { ignoreUnknownKeys = true }
 
 	private fun getConfig(): LyricsConfig {
@@ -234,14 +244,23 @@ class LyricRepository(
 
 					LyricsProvider.SUBSONIC -> {
 						val subsonicLyrics = SessionManager.api.getLyrics(song.id).firstOrNull()
-						val lines = subsonicLyrics?.lines?.map { line ->
-							LyricLine(time = line.start.milliseconds, text = line.value)
+
+						val lines = subsonicLyrics?.lines?.flatMap { line ->
+							if (!subsonicLyrics.synced && line.value.contains("\n")) {
+								line.value.lineSequence()
+									.filter { it.isNotBlank() }
+									.map { LyricLine(time = null, text = it.trim()) }
+									.toList()
+							} else {
+								val time = if (subsonicLyrics.synced) line.start.milliseconds else null
+								listOf(LyricLine(time = time, text = line.value))
+							}
 						}
 
 						if (!lines.isNullOrEmpty()) {
 							rawContentToCache = lines.joinToString("\n") { l ->
 								val t = l.time
-								if (t != null && t.inWholeMilliseconds > 0) {
+								if (t != null) {
 									val m = t.inWholeMinutes.toString().padStart(2, '0')
 									val s = (t.inWholeSeconds % 60).toString().padStart(2, '0')
 									val ms = ((t.inWholeMilliseconds % 1000) / 10).toString()
@@ -255,6 +274,18 @@ class LyricRepository(
 				}
 
 				if (!parsedLyrics.isNullOrEmpty()) {
+					try {
+						rawContentToCache?.let { content ->
+							val entity = LyricEntity(
+								songId = song.id,
+								provider = provider,
+								rawContent = content
+							)
+							lyricDao.insertLyrics(entity)
+						}
+					} catch (e: Exception) {
+						Logger.e("LyricRepository", "Failed to cache lyrics for ${song.title}", e)
+					}
 					return LyricsResult(parsedLyrics, provider, rawContentToCache)
 				}
 			} catch (e: Exception) {

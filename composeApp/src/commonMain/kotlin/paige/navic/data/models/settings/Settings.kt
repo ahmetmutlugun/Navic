@@ -4,6 +4,7 @@
 
 package paige.navic.data.models.settings
 
+import paige.navic.data.models.settings.enums.AnimationStyle
 import paige.navic.data.models.settings.enums.BottomBarCollapseMode
 import paige.navic.data.models.settings.enums.BottomBarVisibilityMode
 import paige.navic.data.models.settings.enums.FontOption
@@ -11,9 +12,12 @@ import paige.navic.data.models.settings.enums.GridSize
 import paige.navic.data.models.settings.enums.MarqueeSpeed
 import paige.navic.data.models.settings.enums.MiniPlayerProgressStyle
 import paige.navic.data.models.settings.enums.MiniPlayerStyle
+import paige.navic.data.models.settings.enums.NavigationBarLabelVisibility
 import paige.navic.data.models.settings.enums.NavigationBarStyle
 import paige.navic.data.models.settings.enums.NowPlayingBackgroundStyle
 import paige.navic.data.models.settings.enums.NowPlayingSliderStyle
+import paige.navic.data.models.settings.enums.OfflineMode
+import paige.navic.data.models.settings.enums.StreamingQuality
 import paige.navic.data.models.settings.enums.Theme
 import paige.navic.data.models.settings.enums.ThemeMode
 import paige.navic.data.models.settings.enums.ToolbarPosition
@@ -24,6 +28,7 @@ class Settings(
 ) : BasePreferenceManager(settings) {
 	var font by preference(FontOption.GoogleSans)
 	var fontPath by preference("")
+	var animationStyle by preference(AnimationStyle.Expressive)
 	var nowPlayingBackgroundStyle by preference(NowPlayingBackgroundStyle.Dynamic)
 	var swipeToSkip by preference(true)
 	var artGridRounding by preference(16f)
@@ -39,10 +44,13 @@ class Settings(
 	var enableScrobbling by preference(true)
 	var scrobblePercentage by preference(.5f)
 	var minDurationToScrobble by preference(30f)
-	var nowPlayingToolbarPosition by preference(ToolbarPosition.Bottom)
 	var replayGain by preference(false)
 	var gaplessPlayback by preference(true)
 	var audioOffload by preference(false)
+	var streamingQualityWifi by preference(StreamingQuality.Lossless)
+	var streamingQualityCellular by preference(StreamingQuality.Lossless)
+	var nowPlayingToolbarPosition by preference(ToolbarPosition.Bottom)
+	var nowPlayingSongInfo by preference(true)
 	var nowPlayingSliderStyle by preference(NowPlayingSliderStyle.Squiggly)
 	var customHeaders by preference("")
 	var checkForUpdates by preference(true)
@@ -51,6 +59,7 @@ class Settings(
 	var bottomBarCollapseMode by preference(BottomBarCollapseMode.OnScroll)
 	var bottomBarVisibilityMode by preference(BottomBarVisibilityMode.Default)
 	var navigationBarStyle by preference(NavigationBarStyle.Normal)
+	var navigationBarLabelVisibility by preference(NavigationBarLabelVisibility.Always)
 	var miniPlayerStyle by preference(MiniPlayerStyle.Detached)
 	var miniPlayerProgressStyle by preference(MiniPlayerProgressStyle.Seekable)
 
@@ -70,11 +79,10 @@ class Settings(
 	// sync related settings
 	var lastFullSyncTime by preference(0L)
 
-	// Keep a map of custom headers so it doesn't need to be parsed every time
 	fun customHeadersMap(): Map<String, String> = buildMap {
 		for (line in customHeaders.lines()) {
 			val parts = line.split(":", limit = 2)
-			if (parts.size < 2) continue // No pair
+			if (parts.size < 2) continue
 
 			val rawKey = parts[0]
 			val rawValue = parts[1]
@@ -84,6 +92,8 @@ class Settings(
 			if (key.isNotEmpty() && value.isNotEmpty()) put(key, value)
 		}
 	}
+
+	var offlineMode by preference(OfflineMode.Auto)
 
 	companion object {
 		val shared = Settings(KmpSettings())

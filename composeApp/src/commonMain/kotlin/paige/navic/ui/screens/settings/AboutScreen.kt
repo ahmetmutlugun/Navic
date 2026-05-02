@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.dropUnlessResumed
 import navic.composeapp.generated.resources.Res
 import navic.composeapp.generated.resources.info_app_version
 import navic.composeapp.generated.resources.title_about
@@ -30,7 +31,6 @@ import paige.navic.icons.outlined.ChevronForward
 import paige.navic.ui.components.common.Form
 import paige.navic.ui.components.common.FormRow
 import paige.navic.ui.components.layouts.NestedTopBar
-import paige.navic.utils.fadeFromTop
 
 @Composable
 fun SettingsAboutScreen() {
@@ -53,7 +53,6 @@ fun SettingsAboutScreen() {
 				.padding(innerPadding)
 				.verticalScroll(rememberScrollState())
 				.padding(top = 12.dp, end = 12.dp, start = 12.dp)
-				.fadeFromTop()
 		) {
 			Form {
 				SelectionContainer {
@@ -81,7 +80,7 @@ fun SettingsAboutScreen() {
 					Text(stringResource(Res.string.title_chat))
 					Icon(Icons.Outlined.ChevronForward, null)
 				}
-				FormRow(onClick = {
+				FormRow(onClick = dropUnlessResumed {
 					backStack.add(Screen.Settings.Acknowledgements)
 				}) {
 					Text(stringResource(Res.string.title_acknowledgements))

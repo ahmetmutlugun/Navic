@@ -8,10 +8,10 @@ import kotlinx.coroutines.flow.update
 import paige.navic.data.database.SyncManager
 import paige.navic.data.models.settings.Settings
 import paige.navic.data.session.SessionManager
+import paige.navic.domain.models.DomainExplicitStatus
 import paige.navic.domain.models.DomainRadio
 import paige.navic.domain.models.DomainSong
 import paige.navic.domain.models.DomainSongCollection
-import paige.navic.domain.repositories.CollectionRepository
 import paige.navic.domain.repositories.PlayerStateRepository
 import paige.navic.managers.ConnectivityManager
 import paige.navic.managers.DownloadManager
@@ -32,6 +32,7 @@ import platform.AVFoundation.play
 import platform.AVFoundation.removeTimeObserver
 import platform.AVFoundation.replaceCurrentItemWithPlayerItem
 import platform.AVFoundation.seekToTime
+import platform.AVFoundation.setRate
 import platform.CoreGraphics.CGSizeMake
 import platform.CoreMedia.CMTimeGetSeconds
 import platform.CoreMedia.CMTimeMake
@@ -58,13 +59,11 @@ import platform.UIKit.UIImage
 
 class IOSMediaPlayerViewModel(
 	stateRepository: PlayerStateRepository,
-	collectionRepository: CollectionRepository,
 	downloadManager: DownloadManager,
 	connectivityManager: ConnectivityManager,
 	syncManager: SyncManager
 ) : MediaPlayerViewModel(
 	stateRepository = stateRepository,
-	collectionRepository = collectionRepository,
 	downloadManager = downloadManager,
 	connectivityManager = connectivityManager
 ) {
@@ -170,6 +169,36 @@ class IOSMediaPlayerViewModel(
 		updateNowPlayingInfo(songToPlay)
 	}
 
+	override fun playNextSingle(song: DomainSong) {
+		_uiState.update { state ->
+			val newQueue =
+				if (state.queue.isEmpty())
+					state.queue + song
+				else
+					state.queue.slice(0..state.currentIndex) + song + state.queue.slice(state.currentIndex+1..state.queue.size-1)
+			state.copy(
+				queue = newQueue,
+				currentIndex = if (state.currentIndex == -1) 0 else state.currentIndex,
+				currentSong = if (state.currentIndex == -1) song else state.currentSong
+			)
+		}
+	}
+
+	override fun playNext(collection: DomainSongCollection) {
+		_uiState.update { state ->
+			val newQueue =
+				if (state.queue.isEmpty())
+					state.queue + collection.songs
+				else
+					state.queue.slice(0..state.currentIndex) + collection.songs + state.queue.slice(state.currentIndex+1..state.queue.size-1)
+			state.copy(
+				queue = newQueue,
+				currentIndex = if (state.currentIndex == -1) 0 else state.currentIndex,
+				currentSong = if (state.currentIndex == -1) collection.songs.firstOrNull() else state.currentSong
+			)
+		}
+	}
+
 	override fun playRadio(radio: DomainRadio) {
 		val radioId = "radio_${radio.name.hashCode()}"
 
@@ -206,7 +235,8 @@ class IOSMediaPlayerViewModel(
 			mimeType = "",
 			filePath = radio.streamUrl,
 			starredAt = null,
-			musicBrainzId = null
+			musicBrainzId = null,
+			explicitStatus = DomainExplicitStatus.Unknown
 		)
 
 		val url = NSURL.URLWithString(radio.streamUrl)
@@ -353,6 +383,11 @@ class IOSMediaPlayerViewModel(
 		playAt(0)
 	}
 
+	override fun setPlaybackSpeed(value: Float) {
+		player.setRate(value)
+		_uiState.update { it.copy(playbackSpeed = value) }
+	}
+
 	override fun seek(normalized: Float) {
 		val duration = player.currentItem?.duration ?: return
 		val totalSeconds = CMTimeGetSeconds(duration)
@@ -433,6 +468,7 @@ class IOSMediaPlayerViewModel(
 
 		val url = getSongUrl(song) ?: return
 		player.replaceCurrentItemWithPlayerItem(createAVPlayerItem(url))
+		player.setRate(state.playbackSpeed)
 
 		if (!song.id.startsWith("radio_")) {
 			val durationMs = song.duration.inWholeMilliseconds
@@ -455,6 +491,21 @@ class IOSMediaPlayerViewModel(
 		return AVPlayerItem(AVURLAsset(uRL = url, options = options))
 	}
 
+	private fun getStreamUrl(id: String) =
+		when (connectivityManager.isCellular.value) {
+			true -> SessionManager.api.getStreamUrl(
+				id,
+				Settings.shared.streamingQualityCellular.bitrateIos,
+				Settings.shared.streamingQualityCellular.containerIos
+			)
+
+			false -> SessionManager.api.getStreamUrl(
+				id,
+				Settings.shared.streamingQualityWifi.bitrateIos,
+				Settings.shared.streamingQualityWifi.containerIos
+			)
+		} + "&estimateContentLength=true"
+
 	private fun getSongUrl(song: DomainSong): NSURL? {
 		return when {
 			song.id.startsWith("radio_") && !song.filePath.isNullOrEmpty() -> {
@@ -466,7 +517,7 @@ class IOSMediaPlayerViewModel(
 				if (localPath != null) {
 					NSURL.fileURLWithPath(localPath)
 				} else {
-					NSURL.URLWithString(SessionManager.api.getStreamUrl(song.id))
+					NSURL.URLWithString(getStreamUrl(song.id))
 				}
 			}
 		}

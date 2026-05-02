@@ -12,6 +12,7 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.util.UnstableApi
@@ -40,10 +41,10 @@ import paige.navic.data.database.dao.AlbumDao
 import paige.navic.data.database.mappers.toDomainModel
 import paige.navic.data.models.settings.Settings
 import paige.navic.data.session.SessionManager
+import paige.navic.domain.models.DomainExplicitStatus
 import paige.navic.domain.models.DomainRadio
 import paige.navic.domain.models.DomainSong
 import paige.navic.domain.models.DomainSongCollection
-import paige.navic.domain.repositories.CollectionRepository
 import paige.navic.domain.repositories.PlayerStateRepository
 import paige.navic.managers.AndroidScrobbleManager
 import paige.navic.managers.ConnectivityManager
@@ -89,6 +90,7 @@ class PlaybackService : MediaSessionService(), KoinComponent {
 			.setLoadControl(loadControl)
 			.setMediaSourceFactory(mediaSourceFactory) // Injects custom headers
 			.setHandleAudioBecomingNoisy(true)
+			.setWakeMode(C.WAKE_MODE_NETWORK)
 			.build()
 			.apply {
 				setAudioAttributes(
@@ -170,13 +172,11 @@ class PlaybackService : MediaSessionService(), KoinComponent {
 class AndroidMediaPlayerViewModel(
 	private val application: Application,
 	stateRepository: PlayerStateRepository,
-	collectionRepository: CollectionRepository,
 	private val albumDao: AlbumDao,
 	downloadManager: DownloadManager,
 	connectivityManager: ConnectivityManager
 ) : MediaPlayerViewModel(
 	stateRepository = stateRepository,
-	collectionRepository = collectionRepository,
 	downloadManager = downloadManager,
 	connectivityManager = connectivityManager
 ) {
@@ -202,12 +202,28 @@ class AndroidMediaPlayerViewModel(
 		}
 	}
 
+	private fun getStreamUrl(id: String) =
+		when (connectivityManager.isCellular.value) {
+			true -> SessionManager.api.getStreamUrl(
+				id,
+				Settings.shared.streamingQualityCellular.bitrateAndroid,
+				Settings.shared.streamingQualityCellular.containerAndroid
+			).toUri()
+
+			false -> SessionManager.api.getStreamUrl(
+				id,
+				Settings.shared.streamingQualityWifi.bitrateAndroid,
+				Settings.shared.streamingQualityWifi.containerAndroid
+			).toUri()
+		}.buildUpon().appendQueryParameter("estimateContentLength", "true").build()
+
 	private fun setupController() {
 		viewModelScope.launch {
 			controller?.apply {
 				addListener(object : Player.Listener {
 					override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
 						updatePlaybackState()
+
 						mediaItem?.mediaId?.let { id ->
 							if (!isAvailable(id)) {
 								controller?.seekToNextMediaItem()
@@ -278,7 +294,7 @@ class AndroidMediaPlayerViewModel(
 							player.replaceMediaItem(i, newItem)
 						} else if (localPath == null && isCurrentlyLocal) {
 							val newItem = item.buildUpon()
-								.setUri(SessionManager.api.getStreamUrl(id).toUri())
+								.setUri(getStreamUrl(id))
 								.build()
 							player.replaceMediaItem(i, newItem)
 						}
@@ -365,6 +381,7 @@ class AndroidMediaPlayerViewModel(
 
 			player.shuffleModeEnabled = state.isShuffleEnabled
 			player.repeatMode = state.repeatMode
+			player.playbackParameters = PlaybackParameters(state.playbackSpeed)
 
 			val index = if (state.currentIndex in 0 until mediaItems.size) state.currentIndex else 0
 
@@ -497,14 +514,46 @@ class AndroidMediaPlayerViewModel(
 		viewModelScope.launch {
 			controller?.let { player ->
 				if (index in 0 until player.mediaItemCount) {
-					val song = player.getMediaItemAt(index)
-					if (!isAvailable(song.mediaId)) {
-						player.seekToNextMediaItem()
-					} else {
-						player.seekTo(index, 0L)
-						player.play()
-					}
+					player.seekTo(index, 0L)
+					player.play()
 				}
+			}
+		}
+	}
+
+	override fun playNextSingle(song: DomainSong) {
+		viewModelScope.launch {
+			controller?.addMediaItem(_uiState.value.currentIndex + 1, song.toMediaItem())
+			_uiState.update { state ->
+				val newQueue = 
+					if (state.queue.isEmpty()) 
+						state.queue + song
+					else
+						state.queue.slice(0..state.currentIndex) + song + state.queue.slice(state.currentIndex+1..state.queue.size-1)
+				state.copy(
+					queue = newQueue,
+					currentIndex = if (state.currentIndex == -1) 0 else state.currentIndex,
+					currentSong = if (state.currentIndex == -1) song else state.currentSong
+				)
+			}
+		}
+	}
+
+	override fun playNext(collection: DomainSongCollection) {
+		viewModelScope.launch {
+			val items = collection.songs.map { it.toMediaItem() }
+			controller?.addMediaItems(_uiState.value.currentIndex + 1, items)
+			_uiState.update { state ->
+				val newQueue = 
+					if (state.queue.isEmpty()) 
+						state.queue + collection.songs
+					else
+						state.queue.slice(0..state.currentIndex) + collection.songs + state.queue.slice(state.currentIndex+1..state.queue.size-1)
+				state.copy(
+					queue = newQueue,
+					currentIndex = if (state.currentIndex == -1) 0 else state.currentIndex,
+					currentSong = if (state.currentIndex == -1) collection.songs.firstOrNull() else state.currentSong
+				)
 			}
 		}
 	}
@@ -546,7 +595,8 @@ class AndroidMediaPlayerViewModel(
 				mimeType = "",
 				filePath = radio.streamUrl,
 				starredAt = null,
-				musicBrainzId = null
+				musicBrainzId = null,
+				explicitStatus = DomainExplicitStatus.Unknown
 			)
 
 			val metadata = MediaMetadata.Builder()
@@ -644,7 +694,8 @@ class AndroidMediaPlayerViewModel(
 		viewModelScope.launch {
 			controller?.let { player ->
 				player.repeatMode = when (player.repeatMode) {
-					Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ONE
+					Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+					Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
 					else -> Player.REPEAT_MODE_OFF
 				}
 			}
@@ -668,6 +719,13 @@ class AndroidMediaPlayerViewModel(
 			super.onCleared()
 			controllerFuture?.let { MediaController.releaseFuture(it) }
 		}
+	}
+
+	override fun setPlaybackSpeed(value: Float) {
+		viewModelScope.launch {
+			controller?.setPlaybackSpeed(value)
+		}
+		_uiState.update { it.copy(playbackSpeed = value) }
 	}
 
 	private fun DomainSong.toMediaItem(): MediaItem {
@@ -695,7 +753,7 @@ class AndroidMediaPlayerViewModel(
 				if (localPath != null) {
 					File(localPath).toUri()
 				} else {
-					SessionManager.api.getStreamUrl(id).toUri()
+					getStreamUrl(id)
 				}
 			}
 		}
